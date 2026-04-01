@@ -32,10 +32,6 @@
             or acknowledgment messages.
           </li>
         </ol>
-        <p>
-          Round 3 is the extra commit round: replicas that saw enough round-2
-          votes send one more round of commit messages.
-        </p>
       </section>
 
       <section>
@@ -76,9 +72,6 @@
 
       <section>
         <h3>The Claim</h3>
-        <p>
-          The answer is: round 2 can leave the critical fact too local.
-        </p>
         <p>
           One honest replica may already have enough evidence to commit
           <code>x</code>, while the next leader still cannot tell that this
@@ -326,11 +319,25 @@ C ∩ Q = {B, X, Y}</code></pre>
           <strong>recoverable</strong>.
         </p>
         <p>
+          Real protocols encode this with protocol-specific view-change
+          evidence. The exact mechanism may be prepared or commit-related
+          evidence in PBFT-style protocols, or quorum certificates and vote
+          rules tied to earlier certificates in newer descendants, but the job
+          is the same: the next leader must be forced to respect any value that
+          may already have become mandatory.
+        </p>
+        <p>
           With larger replica sets, such as the FaB-style
           <code>5f + 1</code> regime or the later <code>5f - 1</code> bound, the
           overlap between old and new quorums is larger, so one voting round can
           already leave behind enough honest evidence. At <code>3f + 1</code>,
           it cannot.
+        </p>
+        <p>
+          For the clean FaB-style <code>5f + 1</code> intuition, larger
+          overlap alone already explains why one voting round can be enough.
+          The tighter <code>5f - 1</code> result needs extra
+          certificate-and-lock structure during view change.
         </p>
       </section>
 
@@ -364,6 +371,23 @@ C ∩ Q = {B, X, Y}</code></pre>
           needs 3 rounds should always be read as shorthand for the standard
           regime, not as a literal theorem for every <code>f</code>.
         </p>
+        <p>
+          So what changes when one voting round does become enough?
+          <a href="why-5f-plus-1-helps-two-round-bft.html">
+            The next note answers that question.
+          </a>
+        </p>
+      </section>
+
+      <section>
+        <h3>Series</h3>
+        <p>
+          Next:
+          <a href="why-5f-plus-1-helps-two-round-bft.html">
+            Why larger replica sets can replace the third round in leader-based
+            BFT
+          </a>
+        </p>
       </section>
 
       <section>
@@ -378,13 +402,6 @@ C ∩ Q = {B, X, Y}</code></pre>
           <li>
             <a href="https://arxiv.org/abs/2102.07932">
               Brief Note: Fast Authenticated Byzantine Consensus
-            </a>
-          </li>
-          <li>
-            <a
-              href="https://decentralizedthoughts.github.io/2025-07-18-two-round-Simplex/"
-            >
-              2-round BFT in Simplex style
             </a>
           </li>
         </ul>
