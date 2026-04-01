@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Why view-change safety matters in leader-based BFT</title>
+    <meta
+      name="description"
+      content="Why view-change safety is a useful lens for understanding lower bounds in leader-based BFT, even though it is usually implied by safety."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <a class="back-link" href="index.html">&larr; home</a>
+      <h1>Why view-change safety matters in leader-based BFT</h1>
+      <p class="meta">April 1, 2026</p>
+    </header>
+
+    <main>
+      <section>
+        <p class="lede">
+          This post is about <strong>leader-based</strong> BFT protocols such as
+          PBFT, FaB, and similar view-based designs. The missing piece in many
+          explanations is not just the size of the quorum overlap. It is:
+          <strong>what property the overlap is supposed to guarantee</strong>.
+        </p>
+        <p>
+          The first note in this sequence showed the obstruction at
+          <code>3f + 1</code>. The second showed the clean
+          <code>5f + 1</code> intuition for why one voting round can sometimes
+          be enough. This note extracts the common idea.
+        </p>
+        <p>
+          More precisely, this is the lens I find most useful for
+          understanding the lower bounds in leader-based BFT. The formal 2021
+          theorem is stated for a broadcast abstraction and proved by
+          indistinguishability.
+        </p>
+      </section>
+
+      <section>
+        <h3>The Question</h3>
+        <blockquote>
+          Before doing any quorum arithmetic, what is the protocol actually
+          trying to guarantee at a leader change?
+        </blockquote>
+        <p>
+          That is the right starting point. If you do not define that target
+          first, statements like <code>overlap = f + 1</code> or
+          <code>overlap = 3f + 1</code> do not yet mean anything.
+        </p>
+      </section>
+
+      <section>
+        <h3>Problem Definition</h3>
+        <p>
+          For one slot, block, or decision of leader-based BFT, the protocol has
+          to satisfy:
+        </p>
+        <ul>
+          <li>
+            <strong>Safety:</strong> if any honest replica commits
+            <code>x</code>, then no honest replica may ever commit
+            <code>y != x</code>.
+          </li>
+          <li>
+            <strong>Liveness:</strong> after the network stabilizes and an
+            honest leader gets a view, the honest replicas eventually commit
+            some value.
+          </li>
+          <li>
+            <strong>View-change safety:</strong> if a previous view may
+            already have committed <code>x</code>, then the next leader must not
+            be able to steer honest replicas toward a conflicting value
+            <code>y</code>.
+          </li>
+        </ul>
+        <p>
+          That third item is the heart of the lower-bound intuition.
+        </p>
+        <p>
+          Strictly speaking, view-change safety is usually left implicit
+          because it is already contained in safety. If a later leader causes
+          honest replicas to commit <code>y</code> after some honest replica
+          already committed <code>x</code>, then safety is broken. So
+          view-change safety is not a new top-level correctness property. It is the
+          internal obligation that makes safety survive leader changes.
+        </p>
+      </section>
+
+      <section>
+        <h3>What A View Change Has To Recover</h3>
+        <p>
+          As in the previous two notes, a <strong>view change</strong> is the
+          moment when a new leader gathers a quorum of reports about earlier
+          views and decides how to continue.
+        </p>
+        <p>
+          In the best case, a view commits a value. If it does not, it still
+          has to leave behind enough evidence that the next leader can continue
+          safely. So the problem is not only to decide a value. It is also to
+          fail in a way that preserves enough information for the next leader
+          to stay safe.
+        </p>
+      </section>
+
+      <section>
+        <h3>What Honest Overlap Must Achieve</h3>
+        <p>
+          Now we can define the symbolic object the counting argument is
+          actually trying to capture.
+        </p>
+        <p>
+          Suppose:
+        </p>
+        <ul>
+          <li>
+            <code>C_x</code> is an old commit quorum for value <code>x</code>
+          </li>
+          <li>
+            <code>Q</code> is the quorum the next leader collects during the
+            view change
+          </li>
+        </ul>
+        <p>
+          What do we need from <code>Q</code>?
+        </p>
+        <p>
+          We need <code>Q</code> to contain enough evidence that, if
+          <code>C_x</code> might have existed, the leader's safe-proposal rule
+          is forced to preserve <code>x</code>.
+        </p>
+        <p>
+          That can happen in two ways:
+        </p>
+        <ul>
+          <li>
+            <code>Q</code> explicitly contains a certificate proving the old
+            commit
+          </li>
+          <li>
+            even without such a certificate, the overlap between
+            <code>C_x</code> and <code>Q</code> leaves behind enough honest
+            evidence for <code>x</code> that conflicting values cannot dominate
+          </li>
+        </ul>
+        <p>
+          That second case is where the familiar counting arguments come from.
+        </p>
+        <p>
+          Actual protocols express this with protocol-specific objects:
+          prepared or commit-related evidence carried in PBFT-style
+          view-change messages, and quorum certificates, timeout certificates,
+          and vote rules in HotStuff- and DiemBFT-style designs. The exact
+          objects differ, but they serve the same purpose.
+        </p>
+        <p>
+          The toy condition <code>H_x(Q) &gt; F_y(Q)</code> below is only a
+          clean sufficient condition for intuition. Real protocols can satisfy
+          view-change safety with richer rules. The 2021
+          <code>5f - 1</code> construction is an example: it uses
+          <code>4f - 1</code>-vote quorum certificates,
+          <code>4f - 1</code>-message timeout certificates that lock blocks,
+          and a new-view rule that proposes from the carried-forward lock.
+        </p>
+      </section>
+
+      <section>
+        <h3>A Simple Symbolic Recovery Condition</h3>
+        <p>
+          For the simplest vote-count intuition, define:
+        </p>
+        <p>
+          The notation in this section is just a teaching device for this
+          post.
+        </p>
+        <ul>
+          <li>
+            <code>H_x(Q)</code> = the minimum guaranteed number of honest
+            replicas in <code>Q</code> that came from the old
+            <code>x</code>-commit quorum
+          </li>
+          <li>
+            <code>F_y(Q)</code> = the maximum possible support inside
+            <code>Q</code> for a conflicting value <code>y</code>
+          </li>
+        </ul>
+        <p>
+          Then a very useful sufficient condition is:
+        </p>
+        <pre><code>H_x(Q) &gt; F_y(Q)</code></pre>
+        <p>
+          Why? Because then the new leader cannot safely treat
+          <code>y</code> as equally plausible or stronger than <code>x</code>.
+          The old committed value still dominates in the next view.
+        </p>
+        <p>
+          That is the symbolic target the overlap is supposed to help with.
+        </p>
+      </section>
+
+      <section>
+        <h3>Apply It To 3f + 1</h3>
+        <p>
+          Here:
+        </p>
+        <ul>
+          <li>old quorum size = <code>2f + 1</code></li>
+          <li>new-view quorum size = <code>2f + 1</code></li>
+          <li>total replicas = <code>3f + 1</code></li>
+        </ul>
+        <p>
+          So the overlap is at least:
+        </p>
+        <pre><code>(2f + 1) + (2f + 1) - (3f + 1) = f + 1</code></pre>
+        <p>
+          Among those <code>f + 1</code> overlapping replicas, up to
+          <code>f</code> may be Byzantine. So:
+        </p>
+        <pre><code>H_x(Q) = 1</code></pre>
+        <p>
+          But a conflicting value can still get support from:
+        </p>
+        <ul>
+          <li>up to <code>f</code> honest replicas outside the old quorum</li>
+          <li>up to <code>f</code> Byzantine replicas</li>
+        </ul>
+        <p>
+          So:
+        </p>
+        <pre><code>F_y(Q) = 2f</code></pre>
+        <p>
+          Thus:
+        </p>
+        <pre><code>H_x(Q) = 1 &lt;= 2f = F_y(Q)</code></pre>
+        <p>
+          So the overlap does not guarantee view-change safety. It may leave the
+          next leader with too little honest evidence for <code>x</code>.
+        </p>
+      </section>
+
+      <section>
+        <h3>Apply It To 5f + 1</h3>
+        <p>
+          Here:
+        </p>
+        <ul>
+          <li>old quorum size = <code>4f + 1</code></li>
+          <li>new-view quorum size = <code>4f + 1</code></li>
+          <li>total replicas = <code>5f + 1</code></li>
+        </ul>
+        <p>
+          So the overlap is at least:
+        </p>
+        <pre><code>(4f + 1) + (4f + 1) - (5f + 1) = 3f + 1</code></pre>
+        <p>
+          Remove up to <code>f</code> Byzantine replicas from that overlap and
+          you get:
+        </p>
+        <pre><code>H_x(Q) = 2f + 1</code></pre>
+        <p>
+          Conflicting support is still at most:
+        </p>
+        <pre><code>F_y(Q) = 2f</code></pre>
+        <p>
+          So now:
+        </p>
+        <pre><code>H_x(Q) = 2f + 1 &gt; 2f = F_y(Q)</code></pre>
+        <p>
+          Now the old committed value dominates in the next view.
+        </p>
+        <p>
+          That is the symbolic reason the simple <code>5f + 1</code> intuition
+          works while the simple <code>3f + 1</code> intuition does not.
+        </p>
+      </section>
+
+      <section>
+        <h3>What This Note Shows</h3>
+        <p>
+          This note does not prove the full lower bound. It isolates the safety
+          condition the next view has to satisfy and shows what the overlap is
+          supposed to guarantee. That is enough to see why the simple
+          <code>3f + 1</code> quorum arithmetic fails and why larger replica
+          sets can make a 2-round design plausible.
+        </p>
+      </section>
+
+      <section>
+        <h3>Series</h3>
+        <p>
+          Previous:
+          <a href="why-5f-plus-1-helps-two-round-bft.html">
+            Why larger replica sets can replace the third round in leader-based
+            BFT
+          </a>
+        </p>
+        <p>
+          Start from the beginning:
+          <a href="why-the-third-round-exists.html">
+            Why leader-based 3f+1 BFT needs a third round
+          </a>
+        </p>
+      </section>
+
+      <section>
+        <h3>Sources</h3>
+        <ul>
+          <li>
+            <a href="https://arxiv.org/abs/2102.07240">
+              Good-case Latency of Byzantine Broadcast: A Complete
+              Categorization
+            </a>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2102.07932">
+              Brief Note: Fast Authenticated Byzantine Consensus
+            </a>
+          </li>
+          <li>
+            <a href="https://dip.diem.com/dip-201/">
+              2-chain DiemBFT
+            </a>
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

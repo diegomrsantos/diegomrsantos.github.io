@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Why larger replica sets can replace the third round in leader-based BFT</title>
+    <meta
+      name="description"
+      content="A worked n=11, f=2 example for why larger replica sets can leave behind enough evidence to make two-round leader-based BFT possible."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <a class="back-link" href="index.html">&larr; home</a>
+      <h1>Why larger replica sets can replace the third round in leader-based BFT</h1>
+      <p class="meta">April 1, 2026</p>
+    </header>
+
+    <main>
+      <section>
+        <p class="lede">
+          The previous note explained why leader-based <code>3f + 1</code> BFT
+          needs a third round. This note explains the opposite direction:
+          why, once you have more replicas, one voting round can already leave
+          behind enough honest evidence for the next view.
+        </p>
+        <p>
+          This post is still about <strong>leader-based</strong> BFT protocols
+          such as PBFT and FaB.
+        </p>
+        <p>
+          It gives the clean <code>5f + 1</code> counting intuition. It is not
+          the full proof of the tighter <code>5f - 1</code> result.
+        </p>
+      </section>
+
+      <section>
+        <h3>The Question</h3>
+        <blockquote>
+          If <code>3f + 1</code> fails because the next leader does not inherit
+          enough evidence, what changes at <code>5f + 1</code>?
+        </blockquote>
+        <p>
+          The overlap between the old quorum and the new quorum becomes large
+          enough that the next leader is guaranteed to inherit a built-in
+          honest majority of evidence for the committed value.
+        </p>
+      </section>
+
+      <section>
+        <h3>A Concrete Case</h3>
+        <p>
+          Take <code>f = 2</code> and <code>n = 5f + 1 = 11</code>. Use:
+        </p>
+        <ul>
+          <li>Honest replicas: <code>A, B, C, D, E, F, G, H, I</code></li>
+          <li>Byzantine replicas: <code>X, Y</code></li>
+        </ul>
+        <p>
+          A commit quorum has size <code>n - f = 9</code>. A new leader also
+          collects <code>9</code> view-change messages before moving on.
+        </p>
+        <p>
+          Suppose one honest replica committed <code>x</code> in the old view
+          after seeing those <code>9</code> votes for <code>x</code>. Call that
+          old commit quorum <code>C</code>. Now a new leader starts the next
+          view and collects a fresh quorum <code>Q</code> of <code>9</code>
+          messages.
+        </p>
+        <p>
+          Two such quorums overlap in at least:
+        </p>
+        <pre><code>(4f + 1) + (4f + 1) - (5f + 1) = 3f + 1
+
+For f = 2, that is:
+
+9 + 9 - 11 = 7</code></pre>
+        <p>
+          That is already much better than the <code>3f + 1</code> case. After
+          removing up to <code>f = 2</code> Byzantine replicas from that
+          overlap, the next leader is guaranteed to inherit at least
+          <code>2f + 1 = 5</code> honest witnesses from the old commit quorum.
+        </p>
+        <p>
+          Those <code>5</code> honest replicas are the honest evidence for
+          <code>x</code> that survives into the next view.
+        </p>
+      </section>
+
+      <section>
+        <h3>Why A Conflicting Value Cannot Keep Up</h3>
+        <p>
+          Now ask how much support a conflicting value <code>y</code> can still
+          have in that new-view quorum.
+        </p>
+        <p>
+          At most:
+        </p>
+        <ul>
+          <li><code>f = 2</code> honest replicas can sit outside the old commit quorum and prefer something other than <code>x</code>.</li>
+          <li><code>f = 2</code> Byzantine replicas can equivocate and also claim support for <code>y</code>.</li>
+        </ul>
+        <p>
+          So <code>y</code> can have at most <code>2f = 4</code> supporters in
+          the new-view quorum.
+        </p>
+        <p>
+          That gives the key inequality:
+        </p>
+        <pre><code>evidence for committed x: at least 2f + 1 = 5
+evidence for conflicting y: at most 2f = 4</code></pre>
+        <p>
+          Unlike the <code>3f + 1</code> case, the new leader does not see one
+          lonely honest witness for <code>x</code>. It sees a built-in honest
+          majority of evidence for <code>x</code>.
+        </p>
+      </section>
+
+      <section>
+        <h3>Why This Replaces The Third Round</h3>
+        <p>
+          In <code>3f + 1</code>, the third round is needed because the first
+          voting round can leave the critical fact too private. One honest
+          replica may know that <code>x</code> is now mandatory, while the next
+          leader still cannot recover that fact.
+        </p>
+        <p>
+          In <code>5f + 1</code>, the larger quorums do part of that job for
+          free. Once an honest replica commits <code>x</code>, any future
+          new-view quorum is forced to contain enough honest remnants of that
+          old quorum that <code>x</code> still dominates every conflicting
+          value.
+        </p>
+        <p>
+          That is the intuition for why one voting round can now be enough. The
+          quorum overlap itself spreads the old fact far enough.
+        </p>
+      </section>
+
+      <section>
+        <h3>How Real Protocols Encode This</h3>
+        <p>
+          Real protocols do not literally compare two counters called evidence
+          for <code>x</code> and evidence for <code>y</code>. They encode the
+          same safety condition through protocol objects such as certificates,
+          locks, and vote rules.
+        </p>
+        <p>
+          In PBFT-style protocols, view-change messages carry prepared or
+          commit-related evidence from earlier views. In HotStuff- and
+          DiemBFT-style protocols, proposals, timeout messages, and votes carry
+          quorum certificates and are checked against explicit safety rules.
+          The mechanism changes, but the purpose is the same: a new leader must
+          not be able to revive a conflicting branch once an old one may
+          already be committed.
+        </p>
+      </section>
+
+      <section>
+        <h3>The Easiest Comparison</h3>
+        <table>
+          <colgroup>
+            <col style="width: 16ch" />
+            <col />
+            <col />
+            <col />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Setting</th>
+              <th>Old quorum overlap with new quorum</th>
+              <th>Honest evidence guaranteed to survive</th>
+              <th>Conflicting support can reach</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>n = 3f + 1</code></td>
+              <td><code>f + 1</code></td>
+              <td><code>1</code> honest witness</td>
+              <td>Up to <code>2f</code></td>
+            </tr>
+            <tr>
+              <td><code>n = 5f + 1</code></td>
+              <td><code>3f + 1</code></td>
+              <td><code>2f + 1</code> honest witnesses</td>
+              <td>Up to <code>2f</code></td>
+            </tr>
+          </tbody>
+        </table>
+        <ul>
+          <li>At <code>3f + 1</code>, the old value does not dominate in the next view.</li>
+          <li>At <code>5f + 1</code>, it does.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h3>What About The Later 5f - 1 Result?</h3>
+        <p>
+          The clean counting argument above is a sufficient intuition for the
+          classic <code>5f + 1</code> regime. The later 2021 result is tighter:
+          2-round PBFT-style partially synchronous Byzantine broadcast is
+          possible in the authenticated setting already at
+          <code>n &gt;= 5f - 1</code>.
+        </p>
+        <p>
+          The high-level lesson is the same: once quorums are large enough, one
+          voting round can leave behind enough recoverable evidence for the next
+          view. But the exact <code>5f - 1</code> protocol does not follow from
+          the simple <code>2f + 1</code> versus <code>2f</code> argument used
+          in this note. It uses richer objects instead:
+          <code>4f - 1</code>-vote quorum certificates,
+          <code>4f - 1</code>-message timeout certificates that lock blocks,
+          and a new-view rule that forces the leader to propose from the block
+          locked by that carried-forward evidence.
+        </p>
+        <p>
+          So if your goal is intuition, <code>5f + 1</code> is the easiest case
+          to understand first.
+        </p>
+        <p>
+          At this point the right question is no longer the round count, but
+          what the next view must be able to recover.
+          <a href="why-view-change-safety-matters.html">
+            The next note makes that explicit.
+          </a>
+        </p>
+      </section>
+
+      <section>
+        <h3>Series</h3>
+        <p>
+          Previous:
+          <a href="why-the-third-round-exists.html">
+            Why leader-based 3f+1 BFT needs a third round
+          </a>
+        </p>
+        <p>
+          Next:
+          <a href="why-view-change-safety-matters.html">
+            Why view-change safety matters in leader-based BFT
+          </a>
+        </p>
+      </section>
+
+      <section>
+        <h3>Sources</h3>
+        <ul>
+          <li>
+            <a href="https://arxiv.org/abs/2102.07240">
+              Good-case Latency of Byzantine Broadcast: A Complete
+              Categorization
+            </a>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2102.07932">
+              Brief Note: Fast Authenticated Byzantine Consensus
+            </a>
+          </li>
+          <li>
+            <a href="https://dip.diem.com/dip-201/">
+              2-chain DiemBFT
+            </a>
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

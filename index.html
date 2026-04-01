@@ -59,10 +59,27 @@
           Short posts on distributed systems, protocol design, and things that
           took longer to understand than they should have.
         </p>
+        <p>
+          A 3-part sequence on why leader-based BFT needs a third round, when
+          larger replica sets make 2 rounds possible, and what the next view
+          must be able to recover.
+        </p>
         <ul>
           <li>
             <a href="why-the-third-round-exists.html" target="_self">
-              Why leader-based 3f+1 BFT needs a third round
+              1. Why leader-based 3f+1 BFT needs a third round
+            </a>
+            [4/1/2026]
+          </li>
+          <li>
+            <a href="why-5f-plus-1-helps-two-round-bft.html" target="_self">
+              2. Why larger replica sets can replace the third round in leader-based BFT
+            </a>
+            [4/1/2026]
+          </li>
+          <li>
+            <a href="why-view-change-safety-matters.html" target="_self">
+              3. Why view-change safety matters in leader-based BFT
             </a>
             [4/1/2026]
           </li>
