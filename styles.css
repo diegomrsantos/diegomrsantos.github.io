@@ -65,6 +65,10 @@ p {
   color: #d0d7de;
 }
 
+strong {
+  color: #ffffff;
+}
+
 ul {
   margin: 0;
   padding-left: 24px;
@@ -80,6 +84,95 @@ li ul {
 
 li ul li {
   margin-bottom: 6px;
+}
+
+section + section {
+  margin-top: 40px;
+}
+
+.meta {
+  margin: 10px 0 0;
+  color: #9da7b3;
+  font-size: 0.98rem;
+}
+
+.lede {
+  font-size: 1.08rem;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 22px;
+}
+
+pre,
+code {
+  font-family: "SFMono-Regular", SFMono-Regular, Consolas, "Liberation Mono",
+    Menlo, monospace;
+}
+
+code {
+  padding: 1px 4px;
+  background: #161b22;
+  border-radius: 4px;
+}
+
+pre {
+  overflow-x: auto;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  line-height: 1.45;
+  color: #d0d7de;
+}
+
+pre code {
+  padding: 0;
+  background: transparent;
+}
+
+ol {
+  margin: 0 0 16px;
+  padding-left: 24px;
+}
+
+ol li {
+  margin-bottom: 10px;
+  color: #d0d7de;
+}
+
+blockquote {
+  margin: 0 0 16px;
+  padding-left: 16px;
+  border-left: 3px solid #30363d;
+  color: #b8c1ca;
+}
+
+hr {
+  margin: 28px 0;
+  border: 0;
+  border-top: 1px solid #30363d;
+}
+
+table {
+  width: 100%;
+  margin: 0 0 18px;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 10px 12px;
+  border: 1px solid #30363d;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: #ffffff;
+  background: #161b22;
 }
 
 @media (max-width: 640px) {

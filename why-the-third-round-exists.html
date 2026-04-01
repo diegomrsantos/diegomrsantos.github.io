@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Why leader-based 3f+1 BFT needs a third round</title>
+    <meta
+      name="description"
+      content="A worked n=7, f=2 example for why leader-based, PBFT-style 3f+1 BFT needs a third round."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <a class="back-link" href="index.html">&larr; home</a>
+      <h1>Why leader-based 3f+1 BFT needs a third round</h1>
+      <p class="meta">April 1, 2026</p>
+    </header>
+
+    <main>
+      <section>
+        <p class="lede">
+          This post is about <strong>leader-based</strong> BFT protocols such as
+          PBFT. In the usual <code>3f + 1</code> setting, the happy path is
+          usually described as three rounds:
+        </p>
+        <ol>
+          <li>The leader proposes a value.</li>
+          <li>Replicas vote for it.</li>
+          <li>
+            Replicas who saw enough round-2 votes send one more round of commit
+            or acknowledgment messages.
+          </li>
+        </ol>
+        <p>
+          Round 3 is the extra commit round: replicas that saw enough round-2
+          votes send one more round of commit messages.
+        </p>
+      </section>
+
+      <section>
+        <h3>The Question</h3>
+        <p>
+          The natural question is simple:
+        </p>
+        <blockquote>
+          If a quorum is already <code>2f + 1</code>, and if a replica sees
+          <code>2f + 1</code> votes in round 2, why is that not already enough
+          to commit? Why is round 3 needed at all?
+        </blockquote>
+        <p>
+          If a replica already saw a full quorum, it is tempting to think the
+          job is done. At first glance, round 3 looks redundant.
+        </p>
+      </section>
+
+      <section>
+        <h3>Views and View Change</h3>
+        <p>
+          These protocols run in numbered <strong>views</strong>. Each view has
+          a leader. If replicas stop making progress in one view, they timeout
+          and move to the next view with a different leader. That move is a
+          <strong>view change</strong>.
+        </p>
+        <p>
+          To start the next view, the new leader collects messages from a quorum
+          of replicas. In this post, when I say <strong>the next quorum</strong>,
+          I mean that quorum gathered by the new leader during the view change.
+        </p>
+        <p>
+          So the real question is not just whether one replica saw enough votes.
+          It is whether, if that view ends badly, the next leader can still
+          recover what happened without violating agreement.
+        </p>
+      </section>
+
+      <section>
+        <h3>The Claim</h3>
+        <p>
+          The answer is: round 2 can leave the critical fact too local.
+        </p>
+        <p>
+          One honest replica may already have enough evidence to commit
+          <code>x</code>, while the next leader still cannot tell that this
+          happened. If that occurs, the next view might continue as if nothing
+          was committed.
+        </p>
+        <p>
+          That would be fatal, because once one honest replica commits
+          <code>x</code>, no later view may lead honest replicas to commit a
+          different value <code>y</code>.
+        </p>
+        <p>
+          Round 3 exists to stop that from happening. It spreads the evidence of
+          the old view widely enough that the next leader can recover it during
+          the view change.
+        </p>
+        <p>
+          The rest of the post shows this with one concrete
+          <code>n = 7, f = 2</code> execution. It is not the full impossibility
+          proof, but it makes the obstruction explicit.
+        </p>
+      </section>
+
+      <section>
+        <h3>A Concrete Case</h3>
+        <p>
+          The easiest way to see the issue is to stop talking abstractly and
+          write down one full execution. The example below shows how one honest
+          replica can already have enough evidence to commit <code>x</code>,
+          while the next leader still cannot recover that fact during the view
+          change.
+        </p>
+        <p>
+          Take <code>f = 2</code>, so <code>n = 3f + 1 = 7</code>. Use:
+        </p>
+        <ul>
+          <li>Honest replicas: <code>A, B, C, D, E</code></li>
+          <li>Byzantine replicas: <code>X, Y</code></li>
+        </ul>
+        <p>
+          A commit quorum has size <code>n - f = 5</code>. A new leader also
+          collects <code>5</code> view-change messages before moving on.
+        </p>
+        <p>
+          Two such quorums overlap in at least:
+        </p>
+        <pre><code>(2f + 1) + (2f + 1) - (3f + 1) = f + 1
+
+For f = 2, that is:
+
+5 + 5 - 7 = 3</code></pre>
+        <p>
+          But among those <code>3</code> overlapping replicas, up to
+          <code>2</code> may be Byzantine. So the next quorum is guaranteed to
+          inherit only <strong>one honest witness</strong> from the old commit
+          quorum.
+        </p>
+      </section>
+
+      <section>
+        <h3>World 1: x Is Secretly Committed</h3>
+        <ol>
+          <li>
+            Byzantine leader <code>X</code> equivocates:
+            <ul>
+              <li>sends proposal <code>x</code> to <code>A, B, C</code></li>
+              <li>sends proposal <code>y</code> to <code>D, E</code></li>
+            </ul>
+          </li>
+          <li>
+            Honest replicas vote once:
+            <ul>
+              <li><code>A, B, C</code> vote for <code>x</code></li>
+              <li><code>D, E</code> vote for <code>y</code></li>
+            </ul>
+          </li>
+          <li>
+            Delivery is selective. Replica <code>A</code> receives votes for
+            <code>x</code> from:
+            <code>A, B, C, X, Y</code>
+          </li>
+          <li>
+            That is <code>5</code> votes, so <code>A</code> commits
+            <code>x</code>.
+          </li>
+          <li>
+            Right after that, the network delays <code>A</code>'s outgoing
+            messages. This does not count as an extra Byzantine fault in partial
+            synchrony. It just means the others do not learn yet what
+            <code>A</code> learned.
+          </li>
+          <li>
+            New leader <code>D</code> starts the next view and collects
+            <code>5</code> view-change messages from:
+            <code>B, D, E, X, Y</code>
+          </li>
+        </ol>
+
+        <p>
+          Call the old commit quorum <code>C</code> and the new leader's quorum
+          <code>Q</code>:
+        </p>
+        <pre><code>C = {A, B, C, X, Y}
+Q = {B, D, E, X, Y}
+C ∩ Q = {B, X, Y}</code></pre>
+        <p>
+          The overlap has size <code>3</code>, but only <code>B</code> is
+          guaranteed honest.
+        </p>
+        <p>
+          So what does <code>D</code> learn?
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Replica</th>
+              <th>What D hears in the new view</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>B</code></td>
+              <td>"I voted for <code>x</code>, but I saw no commit proof."</td>
+            </tr>
+            <tr>
+              <td><code>D</code></td>
+              <td>"I voted for <code>y</code>."</td>
+            </tr>
+            <tr>
+              <td><code>E</code></td>
+              <td>"I voted for <code>y</code>."</td>
+            </tr>
+            <tr>
+              <td><code>X</code></td>
+              <td>Byzantine, can claim support for <code>y</code>.</td>
+            </tr>
+            <tr>
+              <td><code>Y</code></td>
+              <td>Byzantine, can claim support for <code>y</code>.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          In reality, <code>A</code> already committed <code>x</code>. So from
+          this point on, any execution that later commits <code>y</code> would
+          violate agreement. In that sense, only <code>x</code> is safe.
+        </p>
+      </section>
+
+      <section>
+        <h3>World 2: The Same New-View Evidence, But No Commit</h3>
+        <p>
+          Now change just one thing. In World 1, replica <code>A</code>
+          received votes for <code>x</code> from
+          <code>A, B, C, X, Y</code> and committed <code>x</code>. In World 2,
+          suppose <code>Y</code>'s vote for <code>x</code> never reaches
+          <code>A</code>.
+        </p>
+        <p>
+          Then <code>A</code> sees only <code>4</code> votes for
+          <code>x</code>:
+          <code>A, B, C, X</code>. That is not enough to commit. So in World 2,
+          no honest replica commits anything in that view.
+        </p>
+        <p>
+          But the new leader <code>D</code> still collects the same
+          <code>5</code> view-change messages from
+          <code>B, D, E, X, Y</code>, and they can still look exactly the same
+          as in World 1:
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Replica</th>
+              <th>What D hears in the new view</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>B</code></td>
+              <td>"I voted for <code>x</code>, but I saw no commit proof."</td>
+            </tr>
+            <tr>
+              <td><code>D</code></td>
+              <td>"I voted for <code>y</code>."</td>
+            </tr>
+            <tr>
+              <td><code>E</code></td>
+              <td>"I voted for <code>y</code>."</td>
+            </tr>
+            <tr>
+              <td><code>X</code></td>
+              <td>Byzantine, can claim support for <code>y</code>.</td>
+            </tr>
+            <tr>
+              <td><code>Y</code></td>
+              <td>Byzantine, can claim support for <code>y</code>.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          So from <code>D</code>'s point of view, World 1 and World 2 look the
+          same, even though in World 1 an honest replica already committed
+          <code>x</code> and in World 2 no one did.
+        </p>
+      </section>
+
+      <section>
+        <h3>Why This Is The Core Difficulty</h3>
+        <p>
+          This is the simplest form of indistinguishability:
+        </p>
+        <ul>
+          <li>In World 1, preserving <code>x</code> is mandatory.</li>
+          <li>
+            In World 2, no honest commit happened yet, so a different value may
+            still be legal.
+          </li>
+          <li>
+            But the new leader sees the same evidence in both worlds, so it
+            cannot know which world it is in.
+          </li>
+        </ul>
+        <p>
+          That is why one honest witness is not enough. A single vote for
+          <code>x</code> proves only that someone supported <code>x</code>. It
+          does <strong>not</strong> prove that an honest replica already saw a
+          full commit quorum for <code>x</code>.
+        </p>
+        <blockquote>
+          A vote for <code>x</code> is not the same thing as durable evidence
+          that <code>x</code> has already become the only legal continuation.
+        </blockquote>
+      </section>
+
+      <section>
+        <h3>What The Third Round Buys</h3>
+        <p>
+          The extra round is not "more votes for no reason". It forces the fact
+          that <code>x</code> is now mandatory to be copied into enough honest
+          places that a future leader cannot miss it.
+        </p>
+        <p>
+          In other words, the third round makes the commit evidence
+          <strong>recoverable</strong>.
+        </p>
+        <p>
+          With larger replica sets, such as the FaB-style
+          <code>5f + 1</code> regime or the later <code>5f - 1</code> bound, the
+          overlap between old and new quorums is larger, so one voting round can
+          already leave behind enough honest evidence. At <code>3f + 1</code>,
+          it cannot.
+        </p>
+      </section>
+
+      <section>
+        <h3>What This Example Does And Does Not Prove</h3>
+        <p>
+          This execution shows the obstruction. It explains why the "hidden
+          commit" story is a useful intuition.
+        </p>
+        <p>
+          It is <strong>not</strong> the full impossibility proof. The formal
+          lower bound is stronger: it rules out all 2-round PBFT-style partially
+          synchronous Byzantine broadcast protocols below the right threshold,
+          not just the naive version sketched here.
+        </p>
+        <p>
+          The precise 2021 result is:
+        </p>
+        <blockquote>
+          2-round PBFT-style partially synchronous Byzantine broadcast is
+          possible if and only if <code>n &gt;= 5f - 1</code>.
+        </blockquote>
+        <p>
+          So for <code>f &gt;= 2</code>, the optimal-resilience point
+          <code>n = 3f + 1</code> lies strictly below that threshold, and the
+          third round is unavoidable.
+        </p>
+        <p>
+          The special case <code>f = 1</code> is different:
+          <code>3f + 1 = 5f - 1 = 4</code>. That is why the usual slogan "3f+1
+          needs 3 rounds" should always be read as shorthand for the standard
+          regime, not as a literal theorem for every <code>f</code>.
+        </p>
+      </section>
+
+      <section>
+        <h3>Sources</h3>
+        <ul>
+          <li>
+            <a href="https://arxiv.org/abs/2102.07240">
+              Good-case Latency of Byzantine Broadcast: A Complete
+              Categorization
+            </a>
+          </li>
+          <li>
+            <a href="https://arxiv.org/abs/2102.07932">
+              Brief Note: Fast Authenticated Byzantine Consensus
+            </a>
+          </li>
+          <li>
+            <a
+              href="https://decentralizedthoughts.github.io/2025-07-18-two-round-Simplex/"
+            >
+              2-round BFT in Simplex style
+            </a>
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
